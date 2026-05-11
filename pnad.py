@@ -11,6 +11,62 @@ if os.path.exists(arquivo_saida):
 
 primeiro = True
 
+# ============================================
+# CARREGA TABELA CNAE
+# ============================================
+
+cnae_df = pd.read_excel(
+    "Estrutura_Atividade_CNAE_Domiciliar_2_0.xls",
+    header=2
+)
+
+# Mantém somente colunas necessárias
+cnae_df = cnae_df.iloc[:, :4]
+
+cnae_df.columns = [
+    "secao",
+    "divisao",
+    "classe",
+    "descricao"
+]
+
+# Converte strings vazias em NaN
+cnae_df = cnae_df.replace(r'^\s*$', pd.NA, regex=True)
+
+# Preenche seção e divisão para baixo
+cnae_df["secao"] = cnae_df["secao"].ffill()
+cnae_df["divisao"] = cnae_df["divisao"].ffill()
+
+# Mantém apenas linhas que possuem classe CNAE
+cnae_classes = cnae_df[cnae_df["classe"].notna()].copy()
+
+# Padroniza classe
+cnae_classes["classe"] = (
+    cnae_classes["classe"]
+    .astype(str)
+    .str.extract(r"(\d+)")[0]
+    .str.zfill(5)
+)
+
+# Padroniza divisão
+cnae_classes["divisao"] = (
+    cnae_classes["divisao"]
+    .astype(str)
+    .str.extract(r"(\d+)")[0]
+    .str.zfill(2)
+)
+
+# Padroniza seção
+cnae_classes["secao"] = (
+    cnae_classes["secao"]
+    .astype(str)
+    .str.strip()
+)
+
+# Cria dicionários
+map_secao = dict(zip(cnae_classes["classe"], cnae_classes["secao"]))
+map_divisao = dict(zip(cnae_classes["classe"], cnae_classes["divisao"]))
+
 for ano in range(2023, 2026):
     for tri in [1, 2, 3, 4]:
 
@@ -143,6 +199,18 @@ for ano in range(2023, 2026):
                         chunksize=100000
                     ):
                         chunk = chunk[chunk["UF"] == 26]
+
+                        # Padroniza V4013
+                        chunk["V4013"] = (
+                            chunk["V4013"]
+                            .astype(str)
+                            .str.replace(".0", "", regex=False)
+                            .str.zfill(5)
+                        )
+
+                        # Cria novas colunas
+                        chunk["secao_cnae"] = chunk["V4013"].map(map_secao)
+                        chunk["divisao_cnae"] = chunk["V4013"].map(map_divisao)
 
                         chunk.to_csv(
                             arquivo_saida,
