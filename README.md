@@ -100,7 +100,7 @@ Se deu certo, aparecerá `(venv)` no início da linha.
 Digite:
 
 ```
-pip install pandas requests
+pip install pandas requests xlrd
 ```
 
 ---
